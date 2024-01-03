@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <meta name="description" content="计算巢是阿里云开放给企业应用服务商的服务管理平台。服务商能够在计算巢上发布私有化部署服务，为其客户提供云上软件一键部署的能力；同时也支持全托管模式的服务，赋能服务商托管其客户资源。">
+  <title>Langchain-chatchat服务部署文档 - Aliyun 计算巢 x Demo</title>
+
+  <link rel="shortcut icon" href="img/favicon.ico">
+
+  <link rel="stylesheet" href="https://unpkg.com/purecss@1.0.0/build/pure-min.css">
+  <link rel="stylesheet" href="css/theme.css">
+  
+
+  
+
+  
+  
+
+  
+    <script src="search/main.js"></script>
+  
+
+  
+
+  <script src="js/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</head>
+
+<body>
+  <div class="container">
+    <div class="nav">
+      <div class="nav-inner">
+        <div class="logo">
+          <img src="./img/logo-2x.png">
+        </div>
+        <div class="nav-list">
+          <ul>
+          
+              <li><a href="#langchain-chatchat">Langchain-chatchat服务部署文档</a></li>
+              
+                  <li><a href="#_1">概述</a></li>
+                  
+              
+                  <li><a href="#_2">注意事项</a></li>
+                  
+              
+                  <li><a href="#_3">部署架构</a></li>
+                  
+              
+                  <li><a href="#_4">应用配置</a></li>
+                  
+                      <li class="li-h3"><a href="#_5">部署参数说明</a></li>
+                  
+                      <li class="li-h3"><a href="#_6">修改应用白名单</a></li>
+                  
+                      <li class="li-h3"><a href="#_9">向量数据库</a></li>
+                  
+                      <li class="li-h3"><a href="#embedding">embedding模型</a></li>
+                  
+              
+                  <li><a href="#_10">模型配置</a></li>
+                  
+                      <li class="li-h3"><a href="#_11">支持的模型列表</a></li>
+                  
+                      <li class="li-h3"><a href="#deepgpu-llm">使用DeepGPU-LLM转换模型</a></li>
+                  
+                      <li class="li-h3"><a href="#_12">更换模型</a></li>
+                  
+              
+                  <li><a href="#release-note">Release Note</a></li>
+                  
+              
+          
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="content theme-github">
+      
+      <div class="content-inner">        
+        
+        <h1 id="langchain-chatchat">Langchain-chatchat服务部署文档</h1>
+<h2 id="_1">概述</h2>
+<p>Langchain-chatchat服务基于开源本地知识库问答项目<a href="https://github.com/chatchat-space/Langchain-Chatchat">Langchain-Chatchat</a>,
+集成了阿里云推理引擎DeepGPU-LLM，AnalyticDB for PostgreSQL向量数仓等产品，快速构建检索增强生成(RAG)大模型知识库项目。
+本文向您介绍如何开通计算巢上的<code>Demo</code>服务，以及部署流程和使用说明。</p>
+<h2 id="_2">注意事项</h2>
+<p><font color="red">
+阿里云不对第三方模型的合法性、安全性、准确性进行任何保证，阿里云不对由此引发的任何损害承担责任。</p>
+<p>您应自觉遵守第三方模型的用户协议、使用规范和相关法律法规，并就使用第三方模型的合法性、合规性自行承担相关责任。
+</font></br></p>
+<h2 id="_3">部署架构</h2>
+<p>Langchain-chatchat由Nginx、Chat及LLM组成。</p>
+<ul>
+<li>Nginx：网关服务，负责将请求转发到Chat服务。</li>
+<li>Chat：ChatBot应用，支持LLM问答和知识库问答。Database用于存储知识库Embedding后的向量。Database支持<code>faiss</code>及<code>ADB</code>两种类型。</li>
+<li>LLM：模型推理服务，基于开源的FastChat项目部署LLM模型。默认使用DeepGPU-LLM加速推理的qwen-7b-chat-aiacc模型。支持替换为其他开源模型或DeepGPU-LLM加速模型，替换模型可通过pvc挂载到容器中。</li>
+</ul>
+<h2 id="_4">应用配置</h2>
+<h3 id="_5">部署参数说明</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">参数</th>
+<th style="text-align: left;">描述</th>
+<th style="text-align: left;">默认值</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">ACK集群ID</td>
+<td style="text-align: left;">ACK集群ID</td>
+<td style="text-align: left;">无</td>
+</tr>
+<tr>
+<td style="text-align: left;">数据库类型</td>
+<td style="text-align: left;">向量数据库类型。取值：faiss or adb。</td>
+<td style="text-align: left;">faiss</td>
+</tr>
+<tr>
+<td style="text-align: left;">应用登陆名</td>
+<td style="text-align: left;">Nginx登陆名称</td>
+<td style="text-align: left;">admin</td>
+</tr>
+<tr>
+<td style="text-align: left;">应用登陆密码</td>
+<td style="text-align: left;">Nginx登陆密码</td>
+<td style="text-align: left;">无</td>
+</tr>
+<tr>
+<td style="text-align: left;">应用白名单</td>
+<td style="text-align: left;">可以访问应用的IP或者CIDR网段。</td>
+<td style="text-align: left;">127.0.0.1</td>
+</tr>
+<tr>
+<td style="text-align: left;">模型名称</td>
+<td style="text-align: left;">llm模型名称</td>
+<td style="text-align: left;">qwen-7b-chat-aiacc</td>
+</tr>
+<tr>
+<td style="text-align: left;">是否使用量化(8bit)</td>
+<td style="text-align: left;">llm模型int8量化</td>
+<td style="text-align: left;">true</td>
+</tr>
+<tr>
+<td style="text-align: left;">模型PVC</td>
+<td style="text-align: left;">模型存储PVC，挂载到容器内/llm-model目录</td>
+<td style="text-align: left;">true</td>
+</tr>
+<tr>
+<td style="text-align: left;">知识库PVC</td>
+<td style="text-align: left;">已存在的PVC，用于保存本地知识库文件。如使用</td>
+<td style="text-align: left;">无</td>
+</tr>
+<tr>
+<td style="text-align: left;">实例类型</td>
+<td style="text-align: left;">模型推理服务部署方式，取值：ecs or eci。ecs将应用部署到ECS节点上。eci将部署到ECI上（ACK Serverless集群请使用eci）。</td>
+<td style="text-align: left;">ecs</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_6">修改应用白名单</h3>
+<p>应用白名单默认值为127.0.0.1，您可以通过以下方式修改。</p>
+<h4 id="_7">新建服务</h4>
+<p>创建服务时可以指定应用白名单参数，建议添加本机公网出口地址（可通过浏览器访问ifconfig.me、myip.ipip.net获取），否则本机将无法访问服务。</p>
+<h4 id="_8">已有服务</h4>
+<p>如果服务已经创建，可以在服务概览页面 &gt; 实例信息点击SLBACL链接进行修改。SLBACL配置可参考<a href="https://help.aliyun.com/zh/slb/classic-load-balancer/user-guide/overview-3">访问控制</a>。
+<img alt="slbacl" src="slbacl.jpg" title="slbacl" /></p>
+<h3 id="_9">向量数据库</h3>
+<h4 id="faiss">faiss</h4>
+<p>faiss是由facebook开源的一款内存向量库，项目地址<a href="https://github.com/facebookresearch/faiss">https://github.com/facebookresearch/faiss</a>。<br />
+faiss内存数据库部署在chat pod中，受chat pod的资源约束。如果使用faiss向量数据库，建议增加chat pod的内存资源。</p>
+<h4 id="analyticdb-postgresql-adb">AnalyticDB PostgreSQL (简称 ADB)</h4>
+<p>云原生数据仓库AnalyticDB
+PostgreSQL版是一种大规模并行处理（MPP）数据仓库服务，可提供海量数据在线分析服务。产品简介请参考文档<a href="https://help.aliyun.com/zh/analyticdb-for-postgresql/product-overview/overview-product-overview">什么是云原生数据仓库</a>。<br />
+Langchain-chatchat项目中使用的ADB需要满足以下条件：</p>
+<ul>
+<li>需开启向量引擎优化功能</li>
+<li>计算节点规格&gt;=4C16G</li>
+</ul>
+<h3 id="embedding">embedding模型</h3>
+<p>应用内置的embedding模型为text2vec-bge-large-chinese，详情请参考<a href="https://huggingface.co/shibing624/text2vec-bge-large-chinese">hugging face文档</a>。</p>
+<p>chat应用默认使用CPU运行embedding模型，可通过在<code>chat.pod.resources</code>中申请GPU资源来提高文本向量化速度。</p>
+<h2 id="_10">模型配置</h2>
+<h3 id="_11">支持的模型列表</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">模型类型</th>
+<th style="text-align: left;">模型名称</th>
+<th style="text-align: left;">容器内模型文件路径</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">DeepGPU-LLM转换模型</td>
+<td style="text-align: left;">qwen-7b-chat-aiacc</td>
+<td style="text-align: left;">/llm-model/qwen-7b-chat-aiacc</td>
+</tr>
+<tr>
+<td style="text-align: left;">DeepGPU-LLM转换模型</td>
+<td style="text-align: left;">qwen-14b-chat-aiacc</td>
+<td style="text-align: left;">/llm-model/qwen-14b-chat-aiacc</td>
+</tr>
+<tr>
+<td style="text-align: left;">DeepGPU-LLM转换模型</td>
+<td style="text-align: left;">chatglm2-6b-aiacc</td>
+<td style="text-align: left;">/llm-model/chatglm2-6b-aiacc</td>
+</tr>
+<tr>
+<td style="text-align: left;">DeepGPU-LLM转换模型</td>
+<td style="text-align: left;">baichuan2-7b-chat-aiacc</td>
+<td style="text-align: left;">/llm-model/baichuan2-7b-chat-aiacc</td>
+</tr>
+<tr>
+<td style="text-align: left;">DeepGPU-LLM转换模型</td>
+<td style="text-align: left;">baichuan2-13b-chat-aiacc</td>
+<td style="text-align: left;">/llm-model/baichuan2-13b-chat-aiacc</td>
+</tr>
+<tr>
+<td style="text-align: left;">DeepGPU-LLM转换模型</td>
+<td style="text-align: left;">llama-2-7b-hf-aiacc</td>
+<td style="text-align: left;">/llm-model/llama-2-7b-hf-aiacc</td>
+</tr>
+<tr>
+<td style="text-align: left;">DeepGPU-LLM转换模型</td>
+<td style="text-align: left;">llama-2-13b-hf-aiacc</td>
+<td style="text-align: left;">/llm-model/llama-2-13b-hf-aiacc</td>
+</tr>
+<tr>
+<td style="text-align: left;">开源模型</td>
+<td style="text-align: left;">qwen-7b-chat</td>
+<td style="text-align: left;">/llm-model/Qwen-7B-Chat</td>
+</tr>
+<tr>
+<td style="text-align: left;">开源模型</td>
+<td style="text-align: left;">qwen-14b-chat</td>
+<td style="text-align: left;">/llm-model/Qwen-14B-Chat</td>
+</tr>
+<tr>
+<td style="text-align: left;">开源模型</td>
+<td style="text-align: left;">chatglm2-6b</td>
+<td style="text-align: left;">/llm-model/chatglm2-6b</td>
+</tr>
+<tr>
+<td style="text-align: left;">开源模型</td>
+<td style="text-align: left;">chatglm2-6b-32k</td>
+<td style="text-align: left;">/llm-model/chatglm2-6b-32k</td>
+</tr>
+<tr>
+<td style="text-align: left;">开源模型</td>
+<td style="text-align: left;">baichuan2-7b-chat</td>
+<td style="text-align: left;">/llm-model/Baichuan2-7B-Chat</td>
+</tr>
+<tr>
+<td style="text-align: left;">开源模型</td>
+<td style="text-align: left;">baichuan2-13b-chat</td>
+<td style="text-align: left;">/llm-model/Baichuan2-13B-Chat</td>
+</tr>
+<tr>
+<td style="text-align: left;">开源模型</td>
+<td style="text-align: left;">llama-2-7b-hf</td>
+<td style="text-align: left;">/llm-model/Llama-2-7b-hf</td>
+</tr>
+<tr>
+<td style="text-align: left;">开源模型</td>
+<td style="text-align: left;">llama-2-13b-hf</td>
+<td style="text-align: left;">/llm-model/Llama-2-13b-hf</td>
+</tr>
+</tbody>
+</table>
+<h3 id="deepgpu-llm">使用DeepGPU-LLM转换模型</h3>
+<p><a href="https://help.aliyun.com/zh/egs/what-is-deepgpu-llm">DeepGPU-LLM</a>是阿里云研发的基于GPU云服务器的大语言模型（Large
+Language
+Model，LLM）推理引擎，旨在优化大语言模型在GPU云服务器上的推理过程，通过优化和并行计算等技术手段，提供免费的高性能、低延迟推理服务。DeepGPU-LLM使用方式请参考文档<a href="https://help.aliyun.com/zh/egs/developer-reference/install-and-use-deepgpu-llm">使用DeepGPU-LLM实现大语言模型在GPU上的推理优化</a>。</p>
+<p>Langchain-chatchat项目已安装DeepGPU-LLM，默认使用DeepGPU-LLM加速后的模型qwen-7b-chat-aiacc。</p>
+<p>如想要使用DeepGPU-LLM对其他开源LLM模型进行推理优化，您需要先将huggingface格式的开源模型转换为DeepGPU-LLM支持的格式，然后才能使用DeepGPU_LLM进行模型的推理优化服务。以qwen-7b-chat为例，可使用如下命令在容器中进行模型格式转换：</p>
+<pre><code class="language-text">#qwen-7b weight convert
+huggingface_qwen_convert \
+    -in_file /llm-model/Qwen-7B-Chat \
+    -saved_dir /llm-model/qwen-7b-chat-aiacc \
+    -infer_gpu_num 1 \
+    -weight_data_type fp16 \
+    -model_name qwen-7b
+</code></pre>
+<h3 id="_12">更换模型</h3>
+<h4 id="pvpvc">步骤一：创建静态PV及PVC</h4>
+<ul>
+<li>
+<p>OSS模型</p>
+</li>
+<li>
+<p>执行以下命令创建Secret。</p>
+</li>
+</ul>
+<pre><code class="language-bash">kubectl create -f oss-secret.yaml
+</code></pre>
+<p>以下为创建Secret的oss-secret.yaml示例文件，需要指定akId和akSecret。</p>
+<pre><code class="language-yaml">apiVersion: v1
+kind: Secret
+metadata:
+  name: oss-secret
+  namespace: default
+stringData:
+  akId: &lt;your AccessKeyID&gt;
+  akSecret: &lt;your AccessKeySecret&gt;
+</code></pre>
+<ol>
+<li>执行以下命令创建静态卷PV。</li>
+</ol>
+<pre><code class="language-bash">  kubectl create -f model-oss.yaml
+</code></pre>
+<p>以下为创建静态卷PV的model-oss.yaml示例文件，需要指定bucket,url等参数。</p>
+<pre><code class="language-yaml">apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: model-oss
+  labels:
+    alicloud-pvname: model-oss
+spec:
+  capacity:
+    storage: 30Gi
+  accessModes:
+    - ReadOnlyMany
+  persistentVolumeReclaimPolicy: Retain
+  csi:
+    driver: ossplugin.csi.alibabacloud.com
+    volumeHandle: model-oss
+    nodePublishSecretRef:
+      name: oss-secret
+      namespace: default
+    volumeAttributes:
+      bucket: &quot;&lt;your bucket name&gt;&quot;
+      url: &quot;&lt;your oss endpoint&gt;&quot; # oss-cn-hangzhou.aliyuncs.com
+      otherOpts: &quot;-o umask=022 -o max_stat_cache_size=0 -o allow_other&quot;
+      path: &quot;/&quot;
+</code></pre>
+<ol>
+<li>执行以下命令创建静态卷PVC。</li>
+</ol>
+<pre><code class="language-bash">kubectl create -f pvc-oss.yaml
+</code></pre>
+<p>以下为创建静态卷PVC的model-pvc.yaml示例文件。</p>
+<pre><code class="language-yaml">apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: model-pvc
+spec:
+  accessModes:
+    - ReadOnlyMany
+  resources:
+    requests:
+      storage: 30Gi
+  selector:
+    matchLabels:
+      alicloud-pvname: model-oss
+</code></pre>
+<p>参数配置可参考<a href="https://help.aliyun.com/zh/ack/ack-managed-and-ack-dedicated/user-guide/mount-statically-provisioned-oss-volumes">使用OSS静态存储卷</a>。</p>
+<ul>
+<li>
+<p>NAS模型</p>
+</li>
+<li>
+<p>执行以下命令创建静态卷PV。</p>
+</li>
+</ul>
+<pre><code class="language-bash">kubectl create -f model-nas.yaml
+</code></pre>
+<p>以下为创建静态卷PV的model-nas.yaml示例文件，需要指定NAS服务地址和路径。</p>
+<pre><code class="language-yaml">apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: model-nas
+  labels:
+    alicloud-pvname: model-nas
+spec:
+  capacity:
+    storage: 30Gi
+  accessModes:
+    - ReadWriteMany
+  csi:
+    driver: nasplugin.csi.alibabacloud.com
+    volumeHandle: model-nas
+    volumeAttributes:
+      server: &quot;&lt;your nas server&gt;&quot;
+      path: &quot;&lt;your model path&gt;&quot;
+  mountOptions:
+    - nolock,tcp,noresvport
+    - vers=3
+</code></pre>
+<ol>
+<li>执行以下命令创建静态卷PVC。</li>
+</ol>
+<pre><code class="language-bash">kubectl create -f model-pvc.yaml
+</code></pre>
+<p>以下为创建静态卷PVC的model-pvc.yaml示例文件。</p>
+<pre><code class="language-yaml">kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: model-pvc
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 30Gi
+  selector:
+    matchLabels:
+      alicloud-pvname: model-nas
+</code></pre>
+<p>参数配置可参考<a href="https://help.aliyun.com/zh/ack/ack-managed-and-ack-dedicated/user-guide/mount-statically-provisioned-nas-volumes">使用NAS静态存储卷</a>。</p>
+<h4 id="helm-value">步骤二：更新Helm Value</h4>
+<ol>
+<li>控制台点击变配服务实例。</li>
+<li>选择Chart Values变更</li>
+<li>填写<code>Model</code>为新的模型名称，<code>模型PVC</code>为存储新模型的pvc名称。模型名称及模型挂载路径参考支持的模型列表。</li>
+</ol>
+<h2 id="release-note">Release Note</h2>
+<table>
+<thead>
+<tr>
+<th>版本号</th>
+<th>变更时间</th>
+<th>变更内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>0.1.0</code></td>
+<td>2023年12月26日</td>
+<td>支持阿里云推理引擎DeepGPU-LLM，AnalyticDB for PostgreSQL向量数仓</td>
+</tr>
+</tbody>
+</table>
+        
+      </div>
+
+      <div class="copyrights">© 2009-2022 Aliyun.com 版权所有</div>
+    </div>
+  </div>
+  
+  <!--
+  MkDocs version      : 1.5.3
+  Docs Build Date UTC : 2024-01-03 03:15:52.217377+00:00
+  -->
+</body>
+</html>
